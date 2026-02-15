@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Set
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlparse
 
 # Fix Windows encoding
 if sys.platform == 'win32':
@@ -213,40 +214,100 @@ class FastSponsorLookup:
             pass
         return None
 
+    # Known company domains for quick lookup
+    KNOWN_COMPANY_DOMAINS = {
+        'careers.google.com': 'Google',
+        'jobs.apple.com': 'Apple',
+        'careers.microsoft.com': 'Microsoft',
+        'amazon.jobs': 'Amazon',
+        'careers.barclays.co.uk': 'Barclays',
+        'jobs.hsbc.co.uk': 'HSBC',
+        'careers.nhs.uk': 'NHS',
+        'jobs.tesco.com': 'Tesco',
+        'careers.sainsburys.co.uk': 'Sainsburys',
+    }
+    
     def extract_company_from_url(self, url: str) -> Optional[str]:
-        """Extract company name from job posting URL."""
-        url_lower = url.lower()
+        """Extract company name from job posting URL.
         
-        # Priority patterns (most reliable first)
-        patterns = [
-            # LinkedIn company pages (most reliable)
-            (r'linkedin\.com/company/([^/]+)/?(?:jobs|about)?$', '-'),
-            # Indeed company pages
-            (r'indeed\.com/cmp/([^/]+)', '-'),
-            (r'indeed\.co\.uk/cmp/([^/]+)', '-'),
+        Returns company name if confident, None otherwise.
+        We prioritize accuracy over coverage - false matches hurt user trust.
+        """
+        url_lower = url.lower()
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        
+        # Check known domains first
+        for known_domain, company in self.KNOWN_COMPANY_DOMAINS.items():
+            if known_domain in domain:
+                return company
+        
+        # Try to extract from URL patterns
+        url_patterns = [
+            # LinkedIn company pages - most reliable
+            (r'linkedin\.com/company/([^/]+)/?(?:jobs|about)?$', 'linkedin'),
+            # Indeed company pages  
+            (r'indeed\.(?:com|co\.uk)/cmp/([^/]+)', 'indeed'),
             # Glassdoor company pages
-            (r'glassdoor\.com/Overview/Working-at-([^-]+)-', '-'),
-            (r'glassdoor\.co\.uk/Overview/Working-at-([^-]+)-', '-'),
-            # Subdomain patterns (careers.company.com)
-            (r'^https?://careers\.([^.]+)\.com', '-'),
-            (r'^https?://jobs\.([^.]+)\.com', '-'),
-            (r'^https?://apply\.([^.]+)\.com', '-'),
-            (r'^https?://workday\.([^.]+)\.com', '-'),
+            (r'glassdoor\.(?:com|co\.uk)/Overview/Working-at-([^-]+)-', 'glassdoor'),
+            # Reed
+            (r'reed\.co\.uk/company/([^/]+)', 'reed'),
+            # Totaljobs
+            (r'totaljobs\.com/company/([^/]+)', 'totaljobs'),
         ]
         
-        for pattern, sep in patterns:
+        for pattern, source in url_patterns:
             match = re.search(pattern, url_lower)
             if match:
-                extracted = match.group(1).replace(sep, ' ').title()
-                # Clean up common noise words
-                extracted = re.sub(r'\b(Jobs|Careers|Ltd|Limited|Inc|Corp|Corporation)\b', '', extracted, flags=re.IGNORECASE).strip()
-                # Validate: should be at least 2 characters and contain letters
-                if extracted and len(extracted) >= 2 and any(c.isalpha() for c in extracted):
-                    return extracted
+                extracted = match.group(1).replace('-', ' ').title()
+                cleaned = self._clean_company_name(extracted)
+                if cleaned:
+                    return cleaned
         
-        # For job view pages that don't have company in URL, we can't reliably extract it
-        # Return None rather than guessing wrong
+        # Subdomain extraction (careers.company.com)
+        subdomain_match = re.match(r'^([^.]+)\.(?:careers?|jobs|apply|workday)\.', domain)
+        if subdomain_match:
+            company = subdomain_match.group(1).title()
+            cleaned = self._clean_company_name(company)
+            if cleaned:
+                return cleaned
+        
+        # For job view pages without company in URL, don't guess
+        # This prevents false matches that hurt user trust
+        unreliable_patterns = [
+            'indeed.com/viewjob',
+            'indeed.co.uk/viewjob', 
+            'linkedin.com/jobs/view',
+            'glassdoor.com/job',
+            'reed.co.uk/jobs/',
+        ]
+        
+        for pattern in unreliable_patterns:
+            if pattern in url_lower:
+                # These URLs don't contain company name - would need scraping
+                return None
+        
         return None
+    
+    def _clean_company_name(self, name: str) -> Optional[str]:
+        """Clean and validate extracted company name."""
+        if not name:
+            return None
+            
+        # Remove common noise words
+        noise_words = ['Jobs', 'Careers', 'Ltd', 'Limited', 'Inc', 'Corp', 'Corporation', 'PLC', 'LLC']
+        for word in noise_words:
+            name = re.sub(r'\b' + word + r'\b', '', name, flags=re.IGNORECASE)
+        
+        name = name.strip()
+        
+        # Validate
+        if len(name) < 2:
+            return None
+        if not any(c.isalpha() for c in name):
+            return None
+            
+        return name
     
     def format_result(self, sponsor: Dict, score: float = 1.0) -> str:
         """Format a sponsor record for display."""

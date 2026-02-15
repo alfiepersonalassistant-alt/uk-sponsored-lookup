@@ -565,10 +565,6 @@
                     <div class="stat-label">Official Data</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="search-count">-</div>
-                    <div class="stat-label">Searches</div>
-                </div>
-                <div class="stat">
                     <div class="stat-value">Free</div>
                     <div class="stat-label">Forever</div>
                 </div>
@@ -630,7 +626,7 @@
                 <a href="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers" target="_blank">official sources</a> 
                 before making decisions.
             </p>
-            <p class="footer-meta">Last updated: February 2026 • 140,000+ sponsors</p>
+            <p class="footer-meta">Last updated: Saturday, 15 February 2026 • 140,000+ sponsors • <span id="search-count-footer">-</span> searches</p>
         </div>
     </footer>
 
@@ -829,7 +825,7 @@
                 if (data.error) {
                     showError(data.error);
                 } else if (!data.extracted_company) {
-                    showError('Could not extract company name from this URL. Try entering the company name directly.');
+                    showError('Could not automatically detect the company from this job URL. Please use the "Company Name" tab and enter it manually for best results.');
                 } else if (!data.is_sponsor) {
                     showError(`"${escapeHtml(data.extracted_company)}" is not a registered UK visa sponsor.`);
                 } else {
@@ -858,7 +854,7 @@
                 const response = await fetch(`${API_BASE}/api/stats`);
                 const data = await response.json();
                 if (data.total_searches !== undefined) {
-                    document.getElementById('search-count').textContent = data.total_searches.toLocaleString();
+                    document.getElementById('search-count-footer').textContent = data.total_searches.toLocaleString();
                 }
             } catch (error) {
                 console.log('Could not load stats');

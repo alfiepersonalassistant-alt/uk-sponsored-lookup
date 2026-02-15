@@ -2,8 +2,8 @@ name: Weekly Sponsor Data Update
 
 on:
   schedule:
-    # Run every Sunday at 2 AM UTC
-    - cron: '0 2 * * 0'
+    # Run every Saturday at 06:00 UTC
+    - cron: '0 6 * * 6'
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
@@ -40,8 +40,8 @@ jobs:
     - name: Update footer date
       if: env.Updated != ''
       run: |
-        # Update the date in index.html
-        sed -i "s/Last updated: .*/Last updated: $(date +%B\ %Y) • 140,000+ sponsors/" index.html
+        # Update the date in index.html with day
+        sed -i "s/Last updated: .*/Last updated: $(date +'%A, %d %B %Y') • 140,000+ sponsors • <span id=\"search-count-footer\">-<\/span> searches/" index.html
         
     - name: Commit and push
       if: env.Updated != ''
