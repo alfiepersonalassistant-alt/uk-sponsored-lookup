@@ -7,7 +7,6 @@ Restful API with deduplication and external links.
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from sponsor_lookup import FastSponsorLookup
-from profile_enrichment import ProfileEnricher
 import os
 import sys
 import re
@@ -18,18 +17,12 @@ CORS(app)
 
 CSV_PATH = os.environ.get('SPONSOR_CSV', 'uk_sponsors.csv')
 lookup = None
-enricher = None
 
 @app.before_request
 def init_lookup():
-    global lookup, enricher
+    global lookup
     if lookup is None:
         lookup = FastSponsorLookup(CSV_PATH)
-    if enricher is None:
-        enricher = ProfileEnricher(
-            google_api_key=os.environ.get('GOOGLE_API_KEY'),
-            google_cx=os.environ.get('GOOGLE_CX')
-        )
 
 def generate_external_links(company_name: str, city: str = None, county: str = None) -> dict:
     """Generate UK-specific external profile links for a company using name + location."""
@@ -207,26 +200,11 @@ def stats():
         rating = s['rating']
         ratings[rating] = ratings.get(rating, 0) + 1
     
-    # Get enrichment stats if available
-    enrichment_stats = {}
-    if enricher and hasattr(enricher, 'cache'):
-        try:
-            import sqlite3
-            with sqlite3.connect(enricher.cache.db_path) as conn:
-                cursor = conn.execute("SELECT COUNT(*) FROM profiles")
-                enrichment_stats['cached_profiles'] = cursor.fetchone()[0]
-                
-                cursor = conn.execute("SELECT COUNT(*) FROM profiles WHERE refresh_after > datetime('now')")
-                enrichment_stats['fresh_profiles'] = cursor.fetchone()[0]
-        except:
-            pass
-    
     return jsonify({
         'total_sponsors': len(lookup.sponsors),
         'unique_companies': len(set(s['name'] for s in lookup.sponsors)),
         'top_routes': dict(sorted(routes.items(), key=lambda x: -x[1])[:10]),
-        'ratings': ratings,
-        'enrichment': enrichment_stats
+        'ratings': ratings
     })
 
 @app.route('/', methods=['GET'])
