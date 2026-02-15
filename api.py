@@ -59,7 +59,7 @@ def generate_external_links(company_name: str, city: str = None, county: str = N
         
         # Glassdoor - UK specific
         'glassdoor_overview': f"https://www.glassdoor.co.uk/Overview/Working-at-{company_query}-EI_IE.htm",
-        'glassdoor_jobs': f"https://www.glassdoor.co.uk/Jobs/{company_query}-jobs-SRCH_KO0,{len(company_name)}.htm",
+        'glassdoor_jobs': f"https://www.glassdoor.co.uk/Search/results.htm?keyword={company_query}",
         
         # Companies House - UK official registry
         'companies_house': f"https://find-and-update.company-information.service.gov.uk/search?q={company_query}",
