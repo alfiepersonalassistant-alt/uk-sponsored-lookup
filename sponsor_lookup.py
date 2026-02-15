@@ -217,24 +217,21 @@ class FastSponsorLookup:
         """Extract company name from job posting URL."""
         url_lower = url.lower()
         
+        # Priority patterns (most reliable first)
         patterns = [
-            # LinkedIn patterns
-            (r'linkedin\.com/company/([^/]+)', '-'),
-            (r'linkedin\.com/jobs/view/[^/]+/[^/]+/([^/]+)', '-'),
-            # Indeed patterns
+            # LinkedIn company pages (most reliable)
+            (r'linkedin\.com/company/([^/]+)/?(?:jobs|about)?$', '-'),
+            # Indeed company pages
             (r'indeed\.com/cmp/([^/]+)', '-'),
             (r'indeed\.co\.uk/cmp/([^/]+)', '-'),
-            # Glassdoor patterns
-            (r'glassdoor\.com/Overview/Working-at-([^-]+)', '-'),
-            (r'glassdoor\.co\.uk/Overview/Working-at-([^-]+)', '-'),
-            # Generic patterns
-            (r'/(?:company|employer|about)/([^/]+)', '-'),
-            (r'/(?:careers|jobs)/([^/]+)', '-'),
-            # Subdomain patterns
-            (r'(?:jobs|careers|work)\.([^.]+)\.com', '-'),
-            (r'([^.]+)\.(?:jobs|careers|work)\.com', '-'),
-            (r'apply\.([^.]+)\.com', '-'),
-            (r'careers\.([^.]+)\.com', '-'),
+            # Glassdoor company pages
+            (r'glassdoor\.com/Overview/Working-at-([^-]+)-', '-'),
+            (r'glassdoor\.co\.uk/Overview/Working-at-([^-]+)-', '-'),
+            # Subdomain patterns (careers.company.com)
+            (r'^https?://careers\.([^.]+)\.com', '-'),
+            (r'^https?://jobs\.([^.]+)\.com', '-'),
+            (r'^https?://apply\.([^.]+)\.com', '-'),
+            (r'^https?://workday\.([^.]+)\.com', '-'),
         ]
         
         for pattern, sep in patterns:
@@ -243,13 +240,12 @@ class FastSponsorLookup:
                 extracted = match.group(1).replace(sep, ' ').title()
                 # Clean up common noise words
                 extracted = re.sub(r'\b(Jobs|Careers|Ltd|Limited|Inc|Corp|Corporation)\b', '', extracted, flags=re.IGNORECASE).strip()
-                if extracted:
+                # Validate: should be at least 2 characters and contain letters
+                if extracted and len(extracted) >= 2 and any(c.isalpha() for c in extracted):
                     return extracted
         
-        # If no regex match, try fetching the page for Indeed/LinkedIn job pages
-        if any(x in url_lower for x in ['indeed.com/viewjob', 'indeed.co.uk/viewjob', 'linkedin.com/jobs/view']):
-            return self._fetch_page_title(url)
-        
+        # For job view pages that don't have company in URL, we can't reliably extract it
+        # Return None rather than guessing wrong
         return None
     
     def format_result(self, sponsor: Dict, score: float = 1.0) -> str:
