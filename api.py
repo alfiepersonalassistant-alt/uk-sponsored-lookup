@@ -6,17 +6,53 @@ Restful API with deduplication and external links.
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sponsor_lookup import FastSponsorLookup
 import os
 import sys
 import re
+import json
 from urllib.parse import quote
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
+# Rate limiting - 100 requests per hour per IP
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["100 per hour"],
+    storage_uri="memory://"
+)
+
 CSV_PATH = os.environ.get('SPONSOR_CSV', 'uk_sponsors.csv')
+STATS_FILE = 'stats.json'
 lookup = None
+
+def load_stats():
+    """Load search statistics."""
+    if os.path.exists(STATS_FILE):
+        try:
+            with open(STATS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {'total_searches': 0, 'last_updated': datetime.now().isoformat()}
+
+def save_stats(stats):
+    """Save search statistics."""
+    stats['last_updated'] = datetime.now().isoformat()
+    with open(STATS_FILE, 'w') as f:
+        json.dump(stats, f)
+
+def increment_search():
+    """Increment search counter."""
+    stats = load_stats()
+    stats['total_searches'] += 1
+    save_stats(stats)
+    return stats['total_searches']
 
 @app.before_request
 def init_lookup():
@@ -101,6 +137,7 @@ def health():
     })
 
 @app.route('/api/search', methods=['GET'])
+@limiter.limit("30 per minute")  # Stricter limit for searches
 def search():
     company = request.args.get('company', '').strip()
     threshold = float(request.args.get('threshold', 0.5))
@@ -108,6 +145,9 @@ def search():
     
     if not company:
         return jsonify({'error': 'Company name required'}), 400
+    
+    # Increment search counter
+    total_searches = increment_search()
     
     results = lookup.search(company, threshold=threshold, max_results=50)
     
@@ -162,6 +202,7 @@ def check():
         })
 
 @app.route('/api/url', methods=['POST'])
+@limiter.limit("20 per minute")  # Stricter limit for URL processing
 def check_url():
     data = request.get_json()
     if not data or 'url' not in data:
@@ -200,11 +241,15 @@ def stats():
         rating = s['rating']
         ratings[rating] = ratings.get(rating, 0) + 1
     
+    search_stats = load_stats()
+    
     return jsonify({
         'total_sponsors': len(lookup.sponsors),
         'unique_companies': len(set(s['name'] for s in lookup.sponsors)),
         'top_routes': dict(sorted(routes.items(), key=lambda x: -x[1])[:10]),
-        'ratings': ratings
+        'ratings': ratings,
+        'total_searches': search_stats.get('total_searches', 0),
+        'stats_last_updated': search_stats.get('last_updated')
     })
 
 @app.route('/', methods=['GET'])

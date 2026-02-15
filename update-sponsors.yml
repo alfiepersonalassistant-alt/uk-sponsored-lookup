@@ -1,0 +1,53 @@
+name: Weekly Sponsor Data Update
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  update-sponsors:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Download latest sponsor data
+      run: |
+        # UK Gov publishes CSV at this URL
+        curl -L "https://assets.publishing.service.gov.uk/media/65c0d88deaa441000c4a7e6c/2024-02-05_-_Worker_and_Temporary_Worker.csv" -o uk_sponsors_new.csv
+        
+        # Check if file changed (compare checksums)
+        if [ -f uk_sponsors.csv ]; then
+          if cmp -s uk_sponsors.csv uk_sponsors_new.csv; then
+            echo "No changes detected"
+            rm uk_sponsors_new.csv
+            exit 0
+          fi
+        fi
+        
+        # File changed - replace it
+        mv uk_sponsors_new.csv uk_sponsors.csv
+        echo "Updated=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        
+    - name: Update footer date
+      if: env.Updated != ''
+      run: |
+        # Update the date in index.html
+        sed -i "s/Last updated: .*/Last updated: $(date +%B\ %Y) • 140,000+ sponsors/" index.html
+        
+    - name: Commit and push
+      if: env.Updated != ''
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add uk_sponsors.csv index.html
+        git commit -m "Update sponsor data - $(date +%Y-%m-%d)"
+        git push

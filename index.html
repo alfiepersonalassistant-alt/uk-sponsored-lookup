@@ -565,6 +565,10 @@
                     <div class="stat-label">Official Data</div>
                 </div>
                 <div class="stat">
+                    <div class="stat-value" id="search-count">-</div>
+                    <div class="stat-label">Searches</div>
+                </div>
+                <div class="stat">
                     <div class="stat-value">Free</div>
                     <div class="stat-label">Forever</div>
                 </div>
@@ -847,6 +851,22 @@
                 setLoading(false);
             }
         }
+
+        // Load stats on page load
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                const data = await response.json();
+                if (data.total_searches !== undefined) {
+                    document.getElementById('search-count').textContent = data.total_searches.toLocaleString();
+                }
+            } catch (error) {
+                console.log('Could not load stats');
+            }
+        }
+
+        // Load stats when page loads
+        loadStats();
     </script>
 </body>
 </html>
