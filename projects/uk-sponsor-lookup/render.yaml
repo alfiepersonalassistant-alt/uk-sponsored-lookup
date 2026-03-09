@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: uk-sponsor-lookup
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: SPONSOR_CSV
+        value: uk_sponsors.csv
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
