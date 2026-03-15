@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { session_id, message } = body
     
-    console.log('Received message:', message)
+    console.log('Received - session_id:', session_id, 'message:', message?.substring(0, 50))
     
     // Get or create session in database
     sessionId = session_id
@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
       role: m.role,
       content: m.content
     })) || []
+    
+    console.log('Session:', sessionId, 'History count:', conversationHistory.length)
     
     // Get session data
     const { data: sessionData } = await supabase
