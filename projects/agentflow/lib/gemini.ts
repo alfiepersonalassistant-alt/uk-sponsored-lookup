@@ -70,8 +70,8 @@ After confirmation, show pricing with links.
 - Short responses (1-3 sentences)
 - After confirmation, show pricing
 
-## Off-Topic Redirect
-"I specialize in business automation. What process would you like to automate?"`
+## Off-Topic Redirect (only if completely unrelated to automation or previous question)
+If user mentions something completely unrelated (politics, personal matters, etc), gently redirect.
 
 export async function getAIResponse(
   message: string,
@@ -81,6 +81,8 @@ export async function getAIResponse(
   history: { role: string, content: string }[] = []
 ): Promise<{ reply: string, extractedRequirements: any, nextStep: string, showPricing: boolean }> {
 
+  console.log('getAIResponse called - message:', message?.substring(0, 50), 'history length:', history?.length || 0, 'history:', JSON.stringify(history?.slice(0, 2)))
+  
   try {
     // Build messages array with history
     const messages = [
